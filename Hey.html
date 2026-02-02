@@ -1,0 +1,300 @@
+<!-- index.html
+  Self-contained (no external deps). Responsive. Accessible.
+  Behavior:
+  - User can only click "Yes".
+  - "No" is visible but cannot be clicked or focused.
+  - Optional hover-prank (enabled by default per your latest request): when the pointer gets near "No",
+    it moves to a new spot; if the user follows, it keeps escaping.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hey you still like me?</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card: rgba(255,255,255,0.08);
+      --card2: rgba(255,255,255,0.06);
+      --text: rgba(255,255,255,0.92);
+      --muted: rgba(255,255,255,0.70);
+      --yes: #34d399;
+      --yes2:#22c55e;
+      --ring: rgba(99,102,241,0.45);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background:
+        radial-gradient(1200px 700px at 20% 15%, rgba(99,102,241,0.22), transparent 55%),
+        radial-gradient(900px 500px at 80% 80%, rgba(52,211,153,0.16), transparent 60%),
+        var(--bg);
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+
+    .card {
+      width: min(720px, 100%);
+      background: linear-gradient(180deg, var(--card), var(--card2));
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px;
+      padding: clamp(18px, 3vw, 28px);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+      backdrop-filter: blur(10px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    h1 {
+      margin: 0 0 10px 0;
+      font-size: clamp(22px, 3.2vw, 34px);
+      letter-spacing: 0.2px;
+      line-height: 1.2;
+    }
+
+    p {
+      margin: 0 0 18px 0;
+      color: var(--muted);
+      font-size: clamp(14px, 2.2vw, 16px);
+      line-height: 1.55;
+    }
+
+    .arena {
+      /* “play area” that can host the escaping No button */
+      position: relative;
+      width: 100%;
+      height: clamp(170px, 28vh, 240px);
+      border-radius: 14px;
+      border: 1px dashed rgba(255,255,255,0.18);
+      background: rgba(0,0,0,0.18);
+      overflow: hidden;
+      padding: 12px;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-start;
+      margin-top: 6px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-size: 16px;
+      font-weight: 650;
+      letter-spacing: 0.2px;
+      transition: transform 140ms ease, background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+      user-select: none;
+    }
+
+    button:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 4px var(--ring);
+    }
+
+    #yesBtn {
+      background: linear-gradient(180deg, rgba(52,211,153,0.95), rgba(34,197,94,0.85));
+      border-color: rgba(34,197,94,0.45);
+      color: #062014;
+    }
+    #yesBtn:hover { transform: translateY(-1px); }
+    #yesBtn:active { transform: translateY(0px) scale(0.99); }
+
+    /* "No" is visible but intentionally non-interactive.
+       - pointer-events: none => cannot be clicked AND the cursor can't "initiate a click" on it
+       - tabindex="-1" in HTML => not focusable
+       - aria-hidden="true" on the button => removed from screen reader focus/interaction
+       - we provide a separate, visually-hidden explanation for screen readers (below)
+    */
+    #noBtn {
+      pointer-events: none;      /* hard-disable mouse/touch interaction */
+      cursor: default;           /* cursor will not switch to pointer */
+      opacity: 0.9;
+      position: absolute;        /* moved around inside .arena */
+      left: 12px;
+      top: 12px;
+    }
+
+    /* Visually hidden utility for screen reader-only text */
+    .sr-only {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0, 0, 0, 0) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+    }
+
+    .status {
+      margin-top: 14px;
+      min-height: 1.2em; /* prevents layout jump */
+      font-weight: 650;
+      color: rgba(255,255,255,0.88);
+    }
+
+    .hint {
+      margin-top: 10px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.62);
+    }
+
+    @media (max-width: 420px) {
+      button { width: 100%; }
+      .buttons { flex-direction: column; align-items: stretch; }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="card" aria-labelledby="title">
+    <h1 id="title">Hey you still like me?</h1>
+    <p>
+      Pick wisely. (Only one of these choices is allowed by the laws of this tiny universe.)
+    </p>
+
+    <div class="arena" id="arena" aria-describedby="srNoExplanation">
+      <!-- YES button lives normally in the flow -->
+      <div class="buttons">
+        <button id="yesBtn" type="button">Yes</button>
+      </div>
+
+      <!-- NO button is visible, but not interactive.
+           We hide it from screen readers and provide an alternative explanation in sr-only text. -->
+      <button
+        id="noBtn"
+        type="button"
+        aria-hidden="true"
+        tabindex="-1"
+        title="No (disabled)"
+      >
+        No
+      </button>
+
+      <!-- Accessible alternative: screen readers hear why "No" isn't available without being forced to focus it -->
+      <p class="sr-only" id="srNoExplanation">
+        The "No" option is intentionally disabled as part of a playful interaction. Only the "Yes" button can be activated.
+      </p>
+    </div>
+
+    <!-- Live region so screen readers announce the follow-up after "Yes" -->
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+
+    <div class="hint">
+      Note: “No” is intentionally non-clickable and also dodges your cursor.
+    </div>
+  </main>
+
+  <script>
+    // --- Setup notes ---
+    // - "No" is non-interactive via pointer-events:none + tabindex=-1 + aria-hidden.
+    // - Screen reader users get an explanation via #srNoExplanation.
+    // - "Yes" is the only actionable control. On click, we update the live region.
+
+    const yesBtn = document.getElementById('yesBtn');
+    const noBtn = document.getElementById('noBtn');
+    const arena = document.getElementById('arena');
+    const status = document.getElementById('status');
+
+    yesBtn.addEventListener('click', () => {
+      status.textContent = 'I know that. hehehe.';
+      // Optional: after success, you can freeze the prank by setting prankEnabled = false;
+      // prankEnabled = false;
+    });
+
+    // ============================================================
+    // Hover-prank: make "No" run away when the cursor comes near.
+    // You asked to enable this now. If you want it OFF by default later,
+    // set prankEnabled = false.
+    // ============================================================
+    let prankEnabled = true;
+
+    // Tuning knobs:
+    const TRIGGER_DISTANCE_PX = 90;  // how close the pointer must get before "No" moves
+    const EDGE_PADDING_PX = 12;      // keep the button away from edges
+    const MOVE_COOLDOWN_MS = 220;    // prevents jitter / rapid-fire moves
+
+    let lastMoveAt = 0;
+
+    function clamp(n, min, max) {
+      return Math.max(min, Math.min(max, n));
+    }
+
+    function getRandomPositionWithinArena() {
+      // Place "No" fully within arena bounds.
+      const a = arena.getBoundingClientRect();
+      const b = noBtn.getBoundingClientRect();
+
+      const maxLeft = a.width - b.width - EDGE_PADDING_PX;
+      const maxTop  = a.height - b.height - EDGE_PADDING_PX;
+
+      // Random within bounds
+      const left = EDGE_PADDING_PX + Math.random() * Math.max(0, maxLeft - EDGE_PADDING_PX);
+      const top  = EDGE_PADDING_PX + Math.random() * Math.max(0, maxTop - EDGE_PADDING_PX);
+
+      return { left, top };
+    }
+
+    function moveNoButton() {
+      const now = Date.now();
+      if (now - lastMoveAt < MOVE_COOLDOWN_MS) return;
+      lastMoveAt = now;
+
+      const { left, top } = getRandomPositionWithinArena();
+      noBtn.style.left = `${left}px`;
+      noBtn.style.top = `${top}px`;
+    }
+
+    function distanceToNoButton(pointerX, pointerY) {
+      const b = noBtn.getBoundingClientRect();
+      const cx = b.left + b.width / 2;
+      const cy = b.top + b.height / 2;
+      const dx = pointerX - cx;
+      const dy = pointerY - cy;
+      return Math.hypot(dx, dy);
+    }
+
+    // Listen on the whole arena; when pointer nears "No", it escapes.
+    arena.addEventListener('mousemove', (e) => {
+      if (!prankEnabled) return;
+
+      const d = distanceToNoButton(e.clientX, e.clientY);
+      if (d < TRIGGER_DISTANCE_PX) {
+        moveNoButton();
+      }
+    });
+
+    // Also handle touch/mouse entering the arena (gives an immediate “dodge” feel)
+    arena.addEventListener('mouseenter', () => {
+      if (!prankEnabled) return;
+      // start "No" somewhere not always top-left
+      moveNoButton();
+    });
+
+    // Initial placement so it looks playful immediately.
+    // Comment out if you want it fixed until the cursor comes near.
+    moveNoButton();
+
+    // ============================================================
+    // Future optional enhancement ideas (not implemented here):
+    // - Add a user toggle "Disable prank" that sets prankEnabled=false.
+    // - Add smoother animation (CSS transition) for the "No" button moves.
+    // ============================================================
+  </script>
+</body>
+</html>
